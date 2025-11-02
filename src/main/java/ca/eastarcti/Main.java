@@ -150,9 +150,9 @@ express Statement of Purpose.
   "name": "@minecraft-types/yarn-<MINECRAFT_VERSION>",
   "version": "1.0.0",
   "description": "Typescript definitions for Minecraft <MINECRAFT_VERSION> (Fabric/Yarn mappings), all known builds.",
-  "homepage": "https://github.com/East_Arctica/minecrat-types#readme",
+  "homepage": "https://github.com/East_Arctica/minecraft-types#readme",
   "bugs": {
-    "url": "https://github.com/East_Arctica/minecrat-types/issues"
+    "url": "https://github.com/East_Arctica/minecraft-types/issues"
   },
   "license": "CC0-1.0",
   "author": {
