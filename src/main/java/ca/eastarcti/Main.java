@@ -520,7 +520,11 @@ express Statement of Purpose.
         Path packageJsonPath = Paths.get(versionDir, "package.json");
         String packageJsonContent = PACKAGE_TEMPLATE
                 .replaceAll("<MINECRAFT_VERSION>", intermediary.version)
-                .replaceAll("<DEFAULT_BUILD_NUMBER>", yarns.length > 0 ? String.valueOf(yarns[yarns.length - 1].build) : "0");
+                .replaceAll("<DEFAULT_BUILD_NUMBER>", Arrays.stream(yarns)
+                        .filter(yarn -> yarn.gameVersion.equals(intermediary.version))
+                        .mapToInt(yarn -> yarn.build)
+                        .max()
+                        .orElse(0) + "");
         try {
             Files.writeString(packageJsonPath, packageJsonContent, StandardOpenOption.CREATE);
         } catch (IOException e) {
