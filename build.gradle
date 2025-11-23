@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'com.gradleup.shadow' version '9.2.2'
 }
 
 group = 'ca.eastarcti'
@@ -29,10 +30,8 @@ test {
     useJUnitPlatform()
 }
 
-jar {
+tasks.jar {
     manifest {
-        attributes(
-                'Main-Class': 'ca.eastarcti.Main'
-        )
+        attributes["Main-Class"] = "ca.eastarcti.Main"
     }
 }
