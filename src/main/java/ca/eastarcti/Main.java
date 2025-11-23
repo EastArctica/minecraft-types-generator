@@ -351,12 +351,16 @@ CC0-1.0
 
     private static <T> T getUrl(String url, Class<T> clazz) throws IOException, InterruptedException {
         HttpResponse<String> response;
-        try (HttpClient client = HttpClient.newHttpClient()) {
+        try {
+            HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .build();
 
             response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Error fetching URL: " + url);
+            throw e;
         }
         String responseBody = response.body();
 
@@ -369,12 +373,16 @@ CC0-1.0
         Path tempFile = Files.createTempFile(outputPath.getParent(), "download-", ".tmp");
 
         try {
-            try (HttpClient client = HttpClient.newHttpClient()) {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(downloadUrl.replaceAll(" ", "%20")))
                         .build();
 
                 client.send(request, HttpResponse.BodyHandlers.ofFile(tempFile));
+            } catch (IOException | InterruptedException e) {
+                System.err.println("Error downloading jar from URL: " + downloadUrl);
+                throw e;
             }
 
             // Atomically move temp file to final location
