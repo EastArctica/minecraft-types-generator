@@ -1,5 +1,6 @@
 package ca.eastarcti;
 
+import ca.eastarcti.SummaryCounter;
 import ca.eastarcti.json.FabricIntermediaryData;
 import ca.eastarcti.json.FabricYarnData;
 import ca.eastarcti.json.MojangVersionData;
@@ -277,27 +278,52 @@ CC0-1.0
     private static FabricIntermediaryData[] intermediaries;
     private static FabricYarnData[] yarns;
     private static MojangVersionManifestData versionManifest;
-
-    // Counters for summary
-    private static int intermediariesProcessed = 0;
-    private static int intermediariesDownloaded = 0;
-    private static int minecraftJarsDownloaded = 0;
-    private static int libsDownloaded = 0;
-    private static int yarnsMatchedTotal = 0;
-    private static int yarnsDownloaded = 0;
-    private static int yarnsAlreadyPresent = 0; // yarn.jar already existed on disk
-    private static int namedJarsCreated = 0;
-    private static int namedJarsSkipped = 0;
-    private static int yarnsFailed = 0;
-    // Yarn entries that were matched but not processed because the intermediary had no matching Minecraft version
-    private static int yarnsSkippedNoMinecraftVersion = 0;
-    // Yarn entries that were matched but not processed because processing the intermediary failed
-    private static int yarnsSkippedDueToIntermediaryProcessingFailure = 0;
-    // Yarn entries that reached the remapping step (either created or skipped because named jar existed)
-    private static int yarnsAttemptedRemap = 0;
-    private static int intermediariesFailed = 0;
+    private static SummaryCounter summaryCounter = new SummaryCounter();
 
     public static void main(String[] args) throws IOException, InterruptedException {
+        summaryCounter.addCounter(
+            "intermediaries_processed",
+            "Intermediary entries processed: %2$d");
+        summaryCounter.addCounter(
+            "intermediaries_downloaded",
+            "Intermediaries downloaded: %2$d");
+        summaryCounter.addCounter(
+            "minecraft_jars_downloaded",
+            "Minecraft jars downloaded: %2$d");
+        summaryCounter.addCounter(
+            "libs_downloaded",
+            "Library jars downloaded: %2$d");
+        summaryCounter.addCounter(
+            "yarns_matched_total",
+            "Yarn mappings matched total: %2$d");
+        summaryCounter.addCounter(
+            "yarns_already_present",
+            "Yarn jars already present: %2$d");
+        summaryCounter.addCounter(
+            "yarns_downloaded",
+            "Yarn jars downloaded: %2$d");
+        summaryCounter.addCounter(
+            "yarns_attempted_remap",
+            "Yarn remap attempts (reached remap step): %2$d");
+        summaryCounter.addCounter(
+            "named_jars_created",
+            "Named jars created: %2$d");
+        summaryCounter.addCounter(
+            "named_jars_skipped",
+            "Named jars skipped (already existed): %2$d");
+        summaryCounter.addCounter(
+            "yarns_skipped_no_minecraft_version",
+            "Yarn matched but not processed (missing Minecraft version): %2$d");
+        summaryCounter.addCounter(
+            "yarns_skipped_due_to_intermediary_processing_failure",
+            "Yarn skipped because intermediary processing failed: %2$d");
+        summaryCounter.addCounter(
+            "yarns_failed",
+            "Yarn processing failures: %2$d");
+        summaryCounter.addCounter(
+            "intermediaries_failed",
+            "Intermediary processing failures: %2$d");
+
         // Ensure working directories exists
         Files.createDirectories(Paths.get(WORK_DIR));
         Files.createDirectories(Paths.get(LIBS_DIR));
@@ -312,41 +338,25 @@ CC0-1.0
                     .filter(yarn -> yarn.gameVersion.equals(intermediary.version))
                     .toArray(FabricYarnData[]::new);
 
-            intermediariesProcessed++;
-            yarnsMatchedTotal += matchingYarns.length;
+            summaryCounter.incrementCounter("intermediaries_processed");
+            summaryCounter.incrementCounter("yarns_matched_total", matchingYarns.length);
 
             try {
                 processIntermediary(intermediary, matchingYarns);
             } catch (NoSuchElementException e) {
                 System.out.println("  No matching Minecraft version found for intermediary " + intermediary.version);
                 // Count all matching yarns as skipped because we couldn't find the Mojang version to process them
-                yarnsSkippedNoMinecraftVersion += matchingYarns.length;
+                summaryCounter.incrementCounter("yarns_skipped_no_minecraft_version", matchingYarns.length);
             } catch (Exception e) {
                 System.out.println("  Error processing intermediary " + intermediary.version);
                 e.printStackTrace();
                 // Count all matching yarns as skipped because the intermediary processing failed
-                yarnsSkippedDueToIntermediaryProcessingFailure += matchingYarns.length;
-                intermediariesFailed++;
+                summaryCounter.incrementCounter("yarns_skipped_due_to_intermediary_processing_failure", matchingYarns.length);
+                summaryCounter.incrementCounter("intermediaries_failed", matchingYarns.length);
             }
         }
 
-        // Print quick summary
-        System.out.println();
-        System.out.println("Summary:");
-        System.out.println("  Intermediary entries processed: " + intermediariesProcessed);
-        System.out.println("  Intermediaries downloaded: " + intermediariesDownloaded);
-        System.out.println("  Minecraft jars downloaded: " + minecraftJarsDownloaded);
-        System.out.println("  Library jars downloaded: " + libsDownloaded);
-        System.out.println("  Yarn mappings matched total: " + yarnsMatchedTotal);
-        System.out.println("  Yarn jars already present: " + yarnsAlreadyPresent);
-        System.out.println("  Yarn jars downloaded: " + yarnsDownloaded);
-        System.out.println("  Yarn remap attempts (reached remap step): " + yarnsAttemptedRemap);
-        System.out.println("  Named jars created: " + namedJarsCreated);
-        System.out.println("  Named jars skipped (already existed): " + namedJarsSkipped);
-        System.out.println("  Yarn matched but not processed (missing Minecraft version): " + yarnsSkippedNoMinecraftVersion);
-        System.out.println("  Yarn skipped because intermediary processing failed: " + yarnsSkippedDueToIntermediaryProcessingFailure);
-        System.out.println("  Yarn processing failures: " + yarnsFailed);
-        System.out.println("  Intermediary processing failures: " + intermediariesFailed);
+        summaryCounter.printSummary();
     }
 
     private static <T> T getUrl(String url, Class<T> clazz) throws IOException, InterruptedException {
@@ -443,7 +453,7 @@ CC0-1.0
             try {
                 Files.createDirectories(libPath.getParent());
                 downloadJar(libUrl, libPath);
-                libsDownloaded++;
+                summaryCounter.incrementCounter("libs_downloaded");
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
                 throw e;
@@ -455,7 +465,7 @@ CC0-1.0
                 try {
                     Files.createDirectories(libPath.getParent());
                     downloadJar(libUrl, libPath);
-                    libsDownloaded++;
+                    summaryCounter.incrementCounter("libs_downloaded");
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                     throw e;
@@ -490,24 +500,26 @@ CC0-1.0
             System.out.println("    Download URL: " + downloadUrl);
             try {
                 downloadJar(downloadUrl, yarnPath);
-                yarnsDownloaded++;
+                summaryCounter.incrementCounter("yarns_downloaded");
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
         } else {
             // Yarn jar already present on disk
-            yarnsAlreadyPresent++;
+            summaryCounter.incrementCounter("yarns_already_present");
         }
 
         // If the yarn jar still doesn't exist after attempting download, record a failure and skip
         if (!Files.exists(yarnPath)) {
-            System.err.println("    Yarn jar missing after download attempt for " + yarn.version + ", skipping this yarn.");
-            yarnsFailed++;
+            System.err.println(
+                "    Yarn jar missing after download attempt for " + yarn.version + ", skipping this yarn."
+            );
+            summaryCounter.incrementCounter("yarns_failed");
             return;
         }
 
         // We're about to check/create the named jar (remapping step)
-        yarnsAttemptedRemap++;
+        summaryCounter.incrementCounter("yarns_attempted_remap");
 
         // TODO: Use real temp dir
         Path intermediaryTempJar = Paths.get(WORK_DIR, "intermediary-" + intermediary.version + "-temp.jar");
@@ -522,12 +534,12 @@ CC0-1.0
         if (!Files.exists(outputJar)) {
             try {
                 remapJar("intermediary", "named", yarnPath, intermediaryTempJar, outputJar, classpath);
-                namedJarsCreated++;
+                summaryCounter.incrementCounter("named_jars_created");
                 System.out.println("Remapped intermediary->named: " + outputJar.toAbsolutePath());
             } catch(Exception e) {
                 System.err.println("    Error remapping Yarn " + yarn.version);
                 e.printStackTrace();
-                yarnsFailed++;
+                summaryCounter.incrementCounter("yarns_failed");
                 throw e;
             } finally {
                 // Cleanup intermediary temp jar
@@ -537,7 +549,7 @@ CC0-1.0
             }
         } else {
             System.out.println("    Named jar already exists, skipping: " + outputJar.toAbsolutePath());
-            namedJarsSkipped++;
+            summaryCounter.incrementCounter("named_jars_skipped");
         }
     }
 
@@ -566,7 +578,7 @@ CC0-1.0
         if (!Files.exists(intermediaryPath)) {
              System.out.println("  Download URL: " + intermediaryUrl);
              downloadJar(intermediaryUrl, intermediaryPath);
-             intermediariesDownloaded++;
+            summaryCounter.incrementCounter("intermediaries_downloaded");
         }
 
         // Download minecraft version jar
@@ -580,7 +592,7 @@ CC0-1.0
         if (!Files.exists(clientJarPath)) {
             System.out.println("  Downloading Minecraft version jar: " + clientJarUrl);
             downloadJar(clientJarUrl, clientJarPath);
-            minecraftJarsDownloaded++;
+            summaryCounter.incrementCounter("minecraft_jars_downloaded");
         } else {
             // TODO: Validate hash
         }
@@ -603,7 +615,7 @@ CC0-1.0
             } catch (Exception e) {
                 System.err.println("    Error processing Yarn " + yarn.version);
                 e.printStackTrace();
-                yarnsFailed++;
+                summaryCounter.incrementCounter("yarns_failed");
             }
         }
 
